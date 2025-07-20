@@ -17,6 +17,7 @@ except ImportError:
 
 @dataclass
 class BenchmarkConfig:
+    # Configuration for benchmarking parameters
     batch_sizes: List[int] = None
     input_dims: List[int] = None
     output_dims: List[int] = None
@@ -25,6 +26,7 @@ class BenchmarkConfig:
     device: str = "cuda:0"
     
     def __post_init__(self):
+        # Set default values if not provided
         if self.batch_sizes is None:
             self.batch_sizes = [8, 16, 32, 64, 128]
         if self.input_dims is None:
@@ -34,17 +36,16 @@ class BenchmarkConfig:
 
 class GPUTaskQueueBenchmark:
     def __init__(self, config: BenchmarkConfig):
+        # Initialize benchmark with configuration and resources
         self.config = config
         self.device = torch.device(config.device)
         self.stream = torch.cuda.Stream()
         self.results = {}
-        
-        # Pre-allocate CUDA events for precise timing
         self.start_event = torch.cuda.Event(enable_timing=True)
         self.end_event = torch.cuda.Event(enable_timing=True)
     
     def allocate_pinned_tensors(self, batch_size: int, input_dim: int, output_dim: int) -> Dict:
-        """Allocate pinned memory for zero-copy GPU transfers"""
+        # Allocate host (pinned) and device tensors for data transfer and computation
         return {
             'weights_host': torch.randn(batch_size, input_dim, output_dim, pin_memory=True),
             'inputs_host': torch.randn(batch_size, input_dim, pin_memory=True),
@@ -55,20 +56,20 @@ class GPUTaskQueueBenchmark:
         }
     
     def async_h2d_copy(self, tensors: Dict):
-        """Asynchronous host-to-device copy using pinned memory"""
+        # Asynchronously copy host data to device using a CUDA stream
         with torch.cuda.stream(self.stream):
             tensors['weights_gpu'].copy_(tensors['weights_host'], non_blocking=True)
             tensors['inputs_gpu'].copy_(tensors['inputs_host'], non_blocking=True)
     
     def benchmark_gemv_kernel(self, batch_size: int, input_dim: int, output_dim: int) -> Dict:
-        """Benchmark custom CUDA GEMV kernel"""
+        # Benchmark the custom CUDA GEMV kernel or fallback to PyTorch if extension unavailable
         if not CUDA_AVAILABLE:
             return self._fallback_pytorch_gemv(batch_size, input_dim, output_dim)
         
         tensors = self.allocate_pinned_tensors(batch_size, input_dim, output_dim)
         latencies = []
         
-        # Warmup runs
+        # Warmup phase to stabilize performance
         for _ in range(self.config.num_warmup):
             self.async_h2d_copy(tensors)
             self.stream.synchronize()
@@ -79,7 +80,7 @@ class GPUTaskQueueBenchmark:
             )
             torch.cuda.synchronize()
         
-        # Benchmark runs with precise timing
+        # Benchmarking phase with timing
         for _ in range(self.config.num_trials):
             self.async_h2d_copy(tensors)
             self.stream.synchronize()
@@ -99,7 +100,7 @@ class GPUTaskQueueBenchmark:
         return self._compute_stats(latencies, "CUDA_GEMV")
     
     def benchmark_softmax_kernel(self, batch_size: int, dim: int) -> Dict:
-        """Benchmark custom CUDA softmax kernel"""
+        # Benchmark the custom CUDA softmax kernel or fallback to PyTorch if extension unavailable
         if not CUDA_AVAILABLE:
             return self._fallback_pytorch_softmax(batch_size, dim)
         
@@ -110,14 +111,14 @@ class GPUTaskQueueBenchmark:
         
         latencies = []
         
-        # Warmup
+        # Warmup phase
         for _ in range(self.config.num_warmup):
             inputs_gpu.copy_(inputs_host, non_blocking=True)
             torch.cuda.synchronize()
             cuda_task_queue.batched_softmax(inputs_gpu, outputs_gpu)
             torch.cuda.synchronize()
         
-        # Benchmark
+        # Benchmarking phase with timing
         for _ in range(self.config.num_trials):
             inputs_gpu.copy_(inputs_host, non_blocking=True)
             torch.cuda.synchronize()
@@ -132,11 +133,11 @@ class GPUTaskQueueBenchmark:
         return self._compute_stats(latencies, "CUDA_Softmax")
     
     def benchmark_price_vectors(self, batch_size: int, n_assets: int, n_features: int) -> Dict:
-        """Benchmark price vector processing kernel"""
+        # Benchmark the custom CUDA kernel for price vector processing or fallback to PyTorch if extension unavailable
         if not CUDA_AVAILABLE:
             return self._fallback_pytorch_price_vectors(batch_size, n_assets, n_features)
         
-        prices_host = torch.randn(batch_size, n_assets, pin_memory=True) * 100  # Realistic prices
+        prices_host = torch.randn(batch_size, n_assets, pin_memory=True) * 100
         weights_host = torch.randn(n_assets, n_features, pin_memory=True)
         features_host = torch.zeros(batch_size, n_features, pin_memory=True)
         
@@ -146,7 +147,7 @@ class GPUTaskQueueBenchmark:
         
         latencies = []
         
-        # Warmup
+        # Warmup phase
         for _ in range(self.config.num_warmup):
             prices_gpu.copy_(prices_host, non_blocking=True)
             weights_gpu.copy_(weights_host, non_blocking=True)
@@ -154,7 +155,7 @@ class GPUTaskQueueBenchmark:
             cuda_task_queue.process_price_vectors(prices_gpu, weights_gpu, features_gpu)
             torch.cuda.synchronize()
         
-        # Benchmark
+        # Benchmarking phase with timing
         for _ in range(self.config.num_trials):
             prices_gpu.copy_(prices_host, non_blocking=True)
             weights_gpu.copy_(weights_host, non_blocking=True)
@@ -170,18 +171,16 @@ class GPUTaskQueueBenchmark:
         return self._compute_stats(latencies, "CUDA_PriceVectors")
     
     def _fallback_pytorch_gemv(self, batch_size: int, input_dim: int, output_dim: int) -> Dict:
-        """PyTorch baseline for GEMV operation"""
+        # PyTorch baseline implementation for GEMV (batched matrix-vector multiplication)
         weights = torch.randn(batch_size, input_dim, output_dim, device=self.device)
         inputs = torch.randn(batch_size, input_dim, device=self.device)
         
         latencies = []
         
-        # Warmup
         for _ in range(self.config.num_warmup):
             torch.bmm(inputs.unsqueeze(1), weights).squeeze(1)
             torch.cuda.synchronize()
         
-        # Benchmark
         for _ in range(self.config.num_trials):
             self.start_event.record()
             torch.bmm(inputs.unsqueeze(1), weights).squeeze(1)
@@ -193,17 +192,15 @@ class GPUTaskQueueBenchmark:
         return self._compute_stats(latencies, "PyTorch_GEMV")
     
     def _fallback_pytorch_softmax(self, batch_size: int, dim: int) -> Dict:
-        """PyTorch baseline for softmax operation"""
+        # PyTorch baseline implementation for softmax
         inputs = torch.randn(batch_size, dim, device=self.device)
         
         latencies = []
         
-        # Warmup
         for _ in range(self.config.num_warmup):
             torch.softmax(inputs, dim=1)
             torch.cuda.synchronize()
         
-        # Benchmark
         for _ in range(self.config.num_trials):
             self.start_event.record()
             torch.softmax(inputs, dim=1)
@@ -215,18 +212,16 @@ class GPUTaskQueueBenchmark:
         return self._compute_stats(latencies, "PyTorch_Softmax")
     
     def _fallback_pytorch_price_vectors(self, batch_size: int, n_assets: int, n_features: int) -> Dict:
-        """PyTorch baseline for price vector processing"""
+        # PyTorch baseline implementation for price vector processing
         prices = torch.randn(batch_size, n_assets, device=self.device) * 100
         weights = torch.randn(n_assets, n_features, device=self.device)
         
         latencies = []
         
-        # Warmup
         for _ in range(self.config.num_warmup):
             torch.mm(prices, weights)
             torch.cuda.synchronize()
         
-        # Benchmark
         for _ in range(self.config.num_trials):
             self.start_event.record()
             torch.mm(prices, weights)
@@ -238,7 +233,7 @@ class GPUTaskQueueBenchmark:
         return self._compute_stats(latencies, "PyTorch_PriceVectors")
     
     def _compute_stats(self, latencies: List[float], kernel_name: str) -> Dict:
-        """Compute comprehensive latency statistics"""
+        # Compute statistical metrics from latency measurements
         return {
             'kernel': kernel_name,
             'mean_ms': statistics.mean(latencies),
@@ -252,14 +247,14 @@ class GPUTaskQueueBenchmark:
         }
     
     def run_comprehensive_benchmark(self) -> Dict:
-        """Run all benchmarks across parameter sweep"""
+        # Execute all benchmarks across parameter sweeps and collect results
         results = {}
         
         print("🚀 Starting GPU Task Queue Benchmark")
         print(f"Device: {self.device}")
         print(f"Trials per config: {self.config.num_trials}")
         
-        # GEMV benchmark sweep
+        # Run GEMV benchmarks for all parameter combinations
         for batch_size in self.config.batch_sizes:
             for input_dim in self.config.input_dims:
                 for output_dim in self.config.output_dims:
@@ -268,7 +263,7 @@ class GPUTaskQueueBenchmark:
                     
                     results[key] = self.benchmark_gemv_kernel(batch_size, input_dim, output_dim)
         
-        # Softmax benchmark sweep
+        # Run softmax benchmarks for all relevant dimensions
         for batch_size in self.config.batch_sizes:
             for dim in self.config.input_dims:
                 key = f"softmax_b{batch_size}_d{dim}"
@@ -276,7 +271,7 @@ class GPUTaskQueueBenchmark:
                 
                 results[key] = self.benchmark_softmax_kernel(batch_size, dim)
         
-        # Price vector benchmark sweep
+        # Run price vector benchmarks for specified settings
         for batch_size in self.config.batch_sizes:
             key = f"price_b{batch_size}_a64_f32"
             print(f"⚡ Benchmarking {key}...")
@@ -287,7 +282,7 @@ class GPUTaskQueueBenchmark:
         return results
     
     def plot_results(self, save_path: str = "benchmark_results.png"):
-        """Generate performance visualization"""
+        # Generate and save plots summarizing benchmark results
         if not self.results:
             print("No results to plot. Run benchmark first.")
             return
@@ -295,7 +290,7 @@ class GPUTaskQueueBenchmark:
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle("GPU Task Queue Performance Analysis", fontsize=16)
         
-        # Latency comparison
+        # Plot median latency for each kernel
         kernels = [r['kernel'] for r in self.results.values()]
         medians = [r['median_ms'] for r in self.results.values()]
         
@@ -305,7 +300,7 @@ class GPUTaskQueueBenchmark:
         axes[0, 0].set_xticks(range(len(kernels)))
         axes[0, 0].set_xticklabels(kernels, rotation=45, ha='right')
         
-        # P95 vs Median
+        # Plot P95 vs. Median latency to show latency distribution tails
         p95s = [r['p95_ms'] for r in self.results.values()]
         axes[0, 1].scatter(medians, p95s, alpha=0.7, color='coral')
         axes[0, 1].plot([0, max(medians)], [0, max(medians)], 'k--', alpha=0.5)
@@ -318,7 +313,7 @@ class GPUTaskQueueBenchmark:
         print(f"📊 Results saved to {save_path}")
     
     def print_summary(self):
-        """Print benchmark summary to console"""
+        # Print a summary of benchmark results to the console
         if not self.results:
             print("No results available. Run benchmark first.")
             return
@@ -334,7 +329,7 @@ class GPUTaskQueueBenchmark:
             print(f"  P95: {stats['p95_ms']:.3f}ms")
             print(f"  Mean: {stats['mean_ms']:.3f}ms ± {stats['std_ms']:.3f}ms")
         
-        # Find best performing kernel
+        # Identify the best performing CUDA kernel by median latency
         cuda_results = {k: v for k, v in self.results.items() if 'CUDA' in v['kernel']}
         if cuda_results:
             best = min(cuda_results.items(), key=lambda x: x[1]['median_ms'])
