@@ -1,5 +1,5 @@
 import os
-#Set CUDA_HOME FIRST before any other imports
+# Set the CUDA_HOME environment variable before proceeding with other imports.
 os.environ['CUDA_HOME'] = '/usr'
 from setuptools import setup, Extension
 from pybind11.setup_helpers import Pybind11Extension, build_ext
@@ -7,30 +7,30 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 import torch
 import pybind11
 
-# Detect CUDA capability for optimal compilation
+# Function to detect the CUDA compute capability for optimized compilation.
 def get_cuda_arch():
     if torch.cuda.is_available():
         capability = torch.cuda.get_device_capability()
         return f"sm_{capability[0]}{capability[1]}"
-    return "sm_75"  # Default to GTX 1650
+    return "sm_75"  # Default architecture (e.g., GTX 1650) if CUDA is not available.
 
-# Windows-compatible compilation flags
+# Compilation flags for CUDA, including Windows compatibility considerations.
 cuda_flags = [
-    "--use_fast_math",           # Fast math operations
-    "-O3",                       # Maximum optimization
-    f"-gencode=arch=compute_75,code={get_cuda_arch()}",  # Target architecture
-    "--extended-lambda",         # C++11 lambda support
-    "-DNVTX_DISABLE",           # Disable NVTX on Windows
+    "--use_fast_math",           # Enable fast math operations.
+    "-O3",                       # Apply maximum optimization level.
+    f"-gencode=arch=compute_75,code={get_cuda_arch()}",  # Specify target architecture.
+    "--extended-lambda",         # Enable C++11 lambda support.
+    "-DNVTX_DISABLE",            # Disable NVTX on Windows platforms.
 ]
 
 cpp_flags = [
-    "-O3",                      # Windows optimization flag
-    "-std=c++17",              # C++17 standard
+    "-O3",                       # Apply optimization for Windows.
+    "-std=c++17",                # Use the C++17 standard.
     "-DWITH_CUDA",
-    "-DNVTX_DISABLE",          # Disable NVTX on Windows
+    "-DNVTX_DISABLE",            # Disable NVTX on Windows platforms.
 ]
 
-# CUDA extension with optimized kernels
+# Definition of the CUDA extension with optimized kernels.
 cuda_extension = CUDAExtension(
     name="cuda_task_queue",
     sources=[
