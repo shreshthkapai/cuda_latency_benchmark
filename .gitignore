@@ -1,0 +1,16 @@
+# Ignore Python virtual environments
+cuda_env/
+
+# Ignore build artifacts
+build/
+*.so
+*.pyc
+__pycache__/
+
+# Ignore IDE settings
+.vscode/
+
+# Ignore logs, outputs, and generated results
+results/
+.ninja_log
+*.log
