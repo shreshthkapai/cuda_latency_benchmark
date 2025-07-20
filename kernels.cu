@@ -1,13 +1,13 @@
 #include <cuda_runtime.h>
 #include <cooperative_groups.h>
 
-// Windows NVTX fix
+// NVTX workaround for Windows environments
 #ifdef _WIN32
-    #define NVTX_DISABLE  // Disable NVTX on Windows for now
+    #define NVTX_DISABLE  // Temporarily disable NVTX on Windows
 #endif
 
 #ifdef NVTX_DISABLE
-    // Dummy NVTX macros for Windows
+    // Define dummy NVTX macros for Windows platforms
     #define nvtxRangePush(name) 
     #define nvtxRangePop()
 #else
@@ -16,11 +16,11 @@
 
 namespace cg = cooperative_groups;
 
-// Fast batched GEMV kernel for small vectors (16-128 dims)
+// Kernel for efficient batched GEMV operations with small vector dimensions (16–128)
 __global__ void batched_gemv_kernel(
-    const float* __restrict__ weights,    // [batch_size, input_dim, output_dim]
-    const float* __restrict__ inputs,     // [batch_size, input_dim]
-    float* __restrict__ outputs,          // [batch_size, output_dim]
+    const float* __restrict__ weights,    // Shape: [batch_size, input_dim, output_dim]
+    const float* __restrict__ inputs,     // Shape: [batch_size, input_dim]
+    float* __restrict__ outputs,          // Shape: [batch_size, output_dim]
     int batch_size,
     int input_dim,
     int output_dim
@@ -30,18 +30,18 @@ __global__ void batched_gemv_kernel(
     
     if (batch_idx >= batch_size || output_idx >= output_dim) return;
     
-    // Shared memory for input vector (coalesced loading)
+    // Shared memory allocation for input vectors to optimize memory access
     extern __shared__ float shared_input[];
     
     auto block = cg::this_thread_block();
     
-    // Load input vector into shared memory
+    // Load input vector elements into shared memory for coalesced access
     if (output_idx < input_dim) {
         shared_input[output_idx] = inputs[batch_idx * input_dim + output_idx];
     }
     block.sync();
     
-    // Compute dot product for this output dimension
+    // Compute the dot product for the current output dimension
     float result = 0.0f;
     const float* weight_row = weights + (batch_idx * input_dim + 0) * output_dim + output_idx;
     
@@ -53,10 +53,10 @@ __global__ void batched_gemv_kernel(
     outputs[batch_idx * output_dim + output_idx] = result;
 }
 
-// Optimized softmax with single-pass reduction
+// Softmax kernel with optimized single-pass reduction
 __global__ void batched_softmax_kernel(
-    const float* __restrict__ inputs,     // [batch_size, dim]
-    float* __restrict__ outputs,          // [batch_size, dim]
+    const float* __restrict__ inputs,     // Shape: [batch_size, dim]
+    float* __restrict__ outputs,          // Shape: [batch_size, dim]
     int batch_size,
     int dim
 ) {
@@ -74,7 +74,7 @@ __global__ void batched_softmax_kernel(
     
     auto block = cg::this_thread_block();
     
-    // Find max value (parallel reduction)
+    // Parallel reduction to determine the maximum value for numerical stability
     float local_max = -INFINITY;
     for (int i = tid; i < dim; i += blockDim.x) {
         local_max = fmaxf(local_max, input_batch[i]);
@@ -82,7 +82,7 @@ __global__ void batched_softmax_kernel(
     shared_max[tid] = local_max;
     block.sync();
     
-    // Reduce to find global max
+    // Reduce to obtain the global maximum value
     for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             shared_max[tid] = fmaxf(shared_max[tid], shared_max[tid + stride]);
@@ -91,7 +91,7 @@ __global__ void batched_softmax_kernel(
     }
     float global_max = shared_max[0];
     
-    // Compute exp and sum
+    // Calculate exponentials and their sum for normalization
     float local_sum = 0.0f;
     for (int i = tid; i < dim; i += blockDim.x) {
         float exp_val = expf(input_batch[i] - global_max);
@@ -101,7 +101,7 @@ __global__ void batched_softmax_kernel(
     shared_sum[tid] = local_sum;
     block.sync();
     
-    // Reduce sum
+    // Reduce to compute the total sum of exponentials
     for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
         if (tid < stride) {
             shared_sum[tid] += shared_sum[tid + stride];
@@ -110,17 +110,17 @@ __global__ void batched_softmax_kernel(
     }
     float total_sum = shared_sum[0];
     
-    // Normalize
+    // Normalize outputs to obtain softmax probabilities
     for (int i = tid; i < dim; i += blockDim.x) {
         output_batch[i] /= total_sum;
     }
 }
 
-// High-throughput price vector processing kernel
+// Kernel for high-throughput processing of price vectors
 __global__ void process_price_vectors_kernel(
-    const float* __restrict__ prices,     // [batch_size, n_assets]
-    const float* __restrict__ weights,    // [n_assets, n_features]
-    float* __restrict__ features,         // [batch_size, n_features]
+    const float* __restrict__ prices,     // Shape: [batch_size, n_assets]
+    const float* __restrict__ weights,    // Shape: [n_assets, n_features]
+    float* __restrict__ features,         // Shape: [batch_size, n_features]
     int batch_size,
     int n_assets,
     int n_features
@@ -133,7 +133,7 @@ __global__ void process_price_vectors_kernel(
     const float* price_vector = prices + batch_idx * n_assets;
     float result = 0.0f;
     
-    // Vectorized dot product with manual unrolling
+    // Vectorized dot product computation with manual unrolling for efficiency
     #pragma unroll 4
     for (int i = 0; i < n_assets; i++) {
         result += price_vector[i] * weights[i * n_features + feature_idx];
@@ -142,7 +142,7 @@ __global__ void process_price_vectors_kernel(
     features[batch_idx * n_features + feature_idx] = result;
 }
 
-// C interface for Python interop
+// C interface for integration with Python environments
 extern "C" {
 
 void launch_batched_gemv(
