@@ -10,11 +10,11 @@ from typing import Callable, Any, List, Dict, Tuple
 from contextlib import contextmanager
 import warnings
 
-# Suppress matplotlib warnings for cleaner output
+# Suppress matplotlib user warnings for improved output clarity
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 
 class CUDATimer:
-    """High-precision CUDA event timer for kernel benchmarking"""
+    """Provides high-precision timing for CUDA kernel benchmarking using CUDA events."""
     
     def __init__(self):
         self.start_event = torch.cuda.Event(enable_timing=True)
@@ -22,34 +22,34 @@ class CUDATimer:
     
     @contextmanager
     def time_block(self):
-        """Context manager for timing CUDA operations"""
+        """Context manager for measuring the duration of CUDA operations."""
         self.start_event.record()
         yield
         self.end_event.record()
         torch.cuda.synchronize()
     
     def elapsed_ms(self) -> float:
-        """Get elapsed time in milliseconds"""
+        """Returns the elapsed time between events in milliseconds."""
         return self.start_event.elapsed_time(self.end_event)
 
 def time_cuda_kernel(func: Callable, args: Tuple, stream: torch.cuda.Stream = None, 
                     warmup_runs: int = 10, benchmark_runs: int = 100) -> Dict[str, float]:
     """
-    Time CUDA kernel with proper warmup and statistical analysis
+    Measures execution time of a CUDA kernel with warmup and returns detailed statistics.
     
     Args:
-        func: CUDA kernel function to benchmark
-        args: Arguments to pass to the kernel
-        stream: CUDA stream for async execution
-        warmup_runs: Number of warmup iterations
-        benchmark_runs: Number of benchmark iterations
+        func: The CUDA kernel function to be benchmarked.
+        args: Arguments to be passed to the kernel function.
+        stream: Optional CUDA stream for asynchronous execution.
+        warmup_runs: Number of warmup iterations prior to benchmarking.
+        benchmark_runs: Number of iterations used for benchmarking.
     
     Returns:
-        Dictionary with timing statistics
+        A dictionary containing statistical timing metrics.
     """
     timer = CUDATimer()
     
-    # Warmup runs to eliminate cold-start effects
+    # Perform warmup iterations to reduce cold-start effects
     for _ in range(warmup_runs):
         if stream:
             with torch.cuda.stream(stream):
@@ -58,7 +58,7 @@ def time_cuda_kernel(func: Callable, args: Tuple, stream: torch.cuda.Stream = No
             func(*args)
         torch.cuda.synchronize()
     
-    # Benchmark runs with precise timing
+    # Benchmark iterations with precise timing
     latencies = []
     for _ in range(benchmark_runs):
         if stream:
@@ -74,7 +74,7 @@ def time_cuda_kernel(func: Callable, args: Tuple, stream: torch.cuda.Stream = No
     return compute_latency_stats(latencies)
 
 def compute_latency_stats(latencies: List[float]) -> Dict[str, float]:
-    """Compute comprehensive latency statistics"""
+    """Calculates and returns a set of latency statistics from the provided measurements."""
     latencies_array = np.array(latencies)
     
     return {
@@ -92,43 +92,43 @@ def compute_latency_stats(latencies: List[float]) -> Dict[str, float]:
 def plot_latency_distribution(latencies: List[float], title: str = "Kernel Latency Distribution",
                             save_path: str = None, show_stats: bool = True) -> None:
     """
-    Create professional latency distribution plots
+    Generates and displays a latency distribution plot with optional statistics annotation.
     
     Args:
-        latencies: List of latency measurements in ms
-        title: Plot title
-        save_path: Optional path to save the plot
-        show_stats: Whether to display statistics on plot
+        latencies: List of measured latencies in milliseconds.
+        title: Title for the plot.
+        save_path: Optional file path to save the plot image.
+        show_stats: If True, displays summary statistics on the plot.
     """
-    # Set modern plot style
+    # Apply a modern plotting style for readability
     plt.style.use('seaborn-v0_8-darkgrid')
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
     
-    # Histogram with KDE
+    # Plot histogram with kernel density estimate (KDE)
     ax1.hist(latencies, bins=50, alpha=0.7, color='skyblue', density=True, edgecolor='black')
     
-    # KDE overlay for smooth distribution
+    # Overlay KDE curve if scipy is available
     try:
         from scipy.stats import gaussian_kde
         kde = gaussian_kde(latencies)
         x_range = np.linspace(min(latencies), max(latencies), 200)
         ax1.plot(x_range, kde(x_range), 'r-', linewidth=2, label='KDE')
     except ImportError:
-        pass  # Skip KDE if scipy not available
+        pass  # KDE is omitted if scipy is not installed
     
     ax1.set_xlabel('Latency (ms)')
     ax1.set_ylabel('Density')
     ax1.set_title(f'{title} - Distribution')
     ax1.legend()
     
-    # Box plot for quartile analysis
+    # Add a box plot for quartile visualization
     ax2.boxplot(latencies, vert=True, patch_artist=True,
                 boxprops=dict(facecolor='lightblue', alpha=0.7))
     ax2.set_ylabel('Latency (ms)')
     ax2.set_title(f'{title} - Quartiles')
     ax2.grid(True, alpha=0.3)
     
-    # Add statistics text box if requested
+    # Optionally display summary statistics on the plot
     if show_stats:
         stats = compute_latency_stats(latencies)
         stats_text = f"Mean: {stats['mean_ms']:.3f}ms\n" \
@@ -149,11 +149,11 @@ def plot_latency_distribution(latencies: List[float], title: str = "Kernel Laten
 
 def plot_comparative_performance(results_dict: Dict[str, Dict], save_path: str = None) -> None:
     """
-    Plot comparative performance across different kernels/configurations
+    Creates comparative visualizations of performance metrics across multiple configurations.
     
     Args:
-        results_dict: Dict of {config_name: stats_dict}
-        save_path: Optional path to save the plot
+        results_dict: Dictionary mapping configuration names to their statistics.
+        save_path: Optional file path to save the generated plot.
     """
     plt.style.use('seaborn-v0_8-whitegrid')
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
@@ -163,7 +163,7 @@ def plot_comparative_performance(results_dict: Dict[str, Dict], save_path: str =
     p95_latencies = [results_dict[cfg]['p95_ms'] for cfg in configs]
     throughputs = [1000.0 / results_dict[cfg]['median_ms'] for cfg in configs]  # ops/sec
     
-    # Median latency comparison
+    # Bar chart for median latency
     bars1 = ax1.bar(range(len(configs)), median_latencies, color='steelblue', alpha=0.8)
     ax1.set_xlabel('Configuration')
     ax1.set_ylabel('Median Latency (ms)')
@@ -171,12 +171,12 @@ def plot_comparative_performance(results_dict: Dict[str, Dict], save_path: str =
     ax1.set_xticks(range(len(configs)))
     ax1.set_xticklabels(configs, rotation=45, ha='right')
     
-    # Add value labels on bars
+    # Annotate bars with values
     for bar, latency in zip(bars1, median_latencies):
         ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.001,
                 f'{latency:.3f}ms', ha='center', va='bottom', fontsize=9)
     
-    # P95 vs Median scatter
+    # Scatter plot for median vs. P95 latency
     ax2.scatter(median_latencies, p95_latencies, c=throughputs, cmap='viridis', s=100, alpha=0.7)
     ax2.plot([min(median_latencies), max(median_latencies)], 
              [min(median_latencies), max(median_latencies)], 'k--', alpha=0.5)
@@ -186,7 +186,7 @@ def plot_comparative_performance(results_dict: Dict[str, Dict], save_path: str =
     cbar = plt.colorbar(ax2.collections[0], ax=ax2)
     cbar.set_label('Throughput (ops/sec)')
     
-    # Throughput comparison
+    # Bar chart for throughput
     bars3 = ax3.bar(range(len(configs)), throughputs, color='coral', alpha=0.8)
     ax3.set_xlabel('Configuration')
     ax3.set_ylabel('Throughput (ops/sec)')
@@ -194,7 +194,7 @@ def plot_comparative_performance(results_dict: Dict[str, Dict], save_path: str =
     ax3.set_xticks(range(len(configs)))
     ax3.set_xticklabels(configs, rotation=45, ha='right')
     
-    # Efficiency heatmap (latency variance)
+    # Heatmap to visualize latency variance and other metrics
     variances = [results_dict[cfg]['std_ms'] for cfg in configs]
     efficiency_matrix = np.array([median_latencies, p95_latencies, variances]).T
     
@@ -217,14 +217,14 @@ def plot_comparative_performance(results_dict: Dict[str, Dict], save_path: str =
     plt.show()
 
 def save_results_csv(results_dict: Dict[str, Dict], filename: str = "benchmark_results.csv") -> None:
-    """Save benchmark results to CSV for further analysis"""
+    """Exports benchmark results to a CSV file for further analysis."""
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     
     with open(filename, 'w', newline='') as csvfile:
         if not results_dict:
             return
         
-        # Use first result to determine fieldnames
+        # Extract field names from the first entry
         sample_stats = next(iter(results_dict.values()))
         fieldnames = ['config'] + list(sample_stats.keys())
         
@@ -239,7 +239,7 @@ def save_results_csv(results_dict: Dict[str, Dict], filename: str = "benchmark_r
     print(f"💾 Results exported to {filename}")
 
 def save_results_json(results_dict: Dict[str, Dict], filename: str = "benchmark_results.json") -> None:
-    """Save benchmark results to JSON with metadata"""
+    """Saves the benchmark results to a JSON file, including metadata such as timestamps and device information."""
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     
     output = {
@@ -258,7 +258,7 @@ def save_results_json(results_dict: Dict[str, Dict], filename: str = "benchmark_
     print(f"💾 Results with metadata saved to {filename}")
 
 def format_performance_report(results_dict: Dict[str, Dict]) -> str:
-    """Generate formatted performance report string"""
+    """Produces a formatted string report summarizing performance across all configurations."""
     if not results_dict:
         return "No results to report."
     
@@ -267,7 +267,7 @@ def format_performance_report(results_dict: Dict[str, Dict]) -> str:
     report.append("=" * 80)
     report.append("")
     
-    # Find best and worst performers
+    # Identify the best and worst performing configurations
     median_latencies = [(cfg, stats['median_ms']) for cfg, stats in results_dict.items()]
     best_config, best_latency = min(median_latencies, key=lambda x: x[1])
     worst_config, worst_latency = max(median_latencies, key=lambda x: x[1])
@@ -277,7 +277,7 @@ def format_performance_report(results_dict: Dict[str, Dict]) -> str:
     report.append(f"⚡ Speedup: {worst_latency/best_latency:.1f}x improvement")
     report.append("")
     
-    # Detailed results
+    # Append detailed results for each configuration
     report.append("📊 DETAILED RESULTS:")
     report.append("-" * 80)
     
@@ -292,7 +292,7 @@ def format_performance_report(results_dict: Dict[str, Dict]) -> str:
 
 @contextmanager
 def cuda_memory_profiler():
-    """Context manager to profile CUDA memory usage"""
+    """Context manager for monitoring CUDA memory allocation during code execution."""
     if not torch.cuda.is_available():
         yield None
         return
