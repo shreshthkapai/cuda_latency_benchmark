@@ -4,7 +4,7 @@
 #include <cuda_runtime.h>
 #include <c10/cuda/CUDAStream.h>
 
-// Declarations for CUDA kernel functions implemented in kernels.cu
+// Forward declarations from kernels.cu
 extern "C" {
 void launch_batched_gemv(
     const float* weights, const float* inputs, float* outputs,
@@ -25,7 +25,7 @@ void launch_price_vector_processing(
 );
 }
 
-// PyTorch-compatible tensor wrappers for efficient, zero-copy operations on the GPU
+// PyTorch tensor wrappers for zero-copy GPU operations
 torch::Tensor batched_gemv(
     torch::Tensor weights,
     torch::Tensor inputs,
@@ -91,7 +91,6 @@ torch::Tensor process_price_vectors(
     return features;
 }
 
-// Python module definition using pybind11 for exposing CUDA kernels to Python
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "CUDA task queue kernels for sub-millisecond inference";
 
