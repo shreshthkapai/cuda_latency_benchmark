@@ -24,7 +24,7 @@ class BenchmarkConfig:
     num_warmup: int = 50
     num_trials: int = 1000
     device: str = "cuda:0"
-    run_baseline: bool = True  # NEW: Enable baseline comparison
+    run_baseline: bool = True  # Enable baseline comparison
     
     def __post_init__(self):
         # Set default values if not provided
@@ -42,8 +42,8 @@ class GPUTaskQueueBenchmark:
         self.device = torch.device(config.device)
         self.stream = torch.cuda.Stream()
         self.results = {}
-        self.baseline_results = {}  # NEW: Store baseline results
-        self.speedup_results = {}   # NEW: Store speedup calculations
+        self.baseline_results = {}  # Store baseline results
+        self.speedup_results = {}   # Store speedup calculations
         self.start_event = torch.cuda.Event(enable_timing=True)
         self.end_event = torch.cuda.Event(enable_timing=True)
     
@@ -235,10 +235,9 @@ class GPUTaskQueueBenchmark:
         
         return self._compute_stats(latencies, "PyTorch_PriceVectors")
     
-    # NEW: Baseline implementations using simple/naive CUDA kernels
+    # FIXED: Optimized PyTorch baselines instead of Python loops
     def _benchmark_baseline_gemv(self, batch_size: int, input_dim: int, output_dim: int) -> Dict:
-        """Benchmark naive/unoptimized GEMV implementation"""
-        # Use simple torch operations as baseline (represents unoptimized kernel)
+        """Benchmark optimized PyTorch GEMV implementation"""
         weights = torch.randn(batch_size, input_dim, output_dim, device=self.device)
         inputs = torch.randn(batch_size, input_dim, device=self.device)
         
@@ -246,20 +245,14 @@ class GPUTaskQueueBenchmark:
         
         # Warmup
         for _ in range(self.config.num_warmup):
-            # Simulate naive approach: no shared memory, no vectorization
-            result = torch.zeros(batch_size, output_dim, device=self.device)
-            for b in range(batch_size):
-                for o in range(output_dim):
-                    result[b, o] = torch.sum(inputs[b] * weights[b, :, o])
+            # Use optimized PyTorch batched matrix multiplication
+            torch.bmm(inputs.unsqueeze(1), weights).squeeze(1)
             torch.cuda.synchronize()
         
         # Benchmark
         for _ in range(self.config.num_trials):
             self.start_event.record()
-            result = torch.zeros(batch_size, output_dim, device=self.device)
-            for b in range(batch_size):
-                for o in range(output_dim):
-                    result[b, o] = torch.sum(inputs[b] * weights[b, :, o])
+            torch.bmm(inputs.unsqueeze(1), weights).squeeze(1)
             self.end_event.record()
             
             torch.cuda.synchronize()
@@ -268,27 +261,21 @@ class GPUTaskQueueBenchmark:
         return self._compute_stats(latencies, "Baseline_GEMV")
     
     def _benchmark_baseline_softmax(self, batch_size: int, dim: int) -> Dict:
-        """Benchmark naive/unoptimized softmax implementation"""
+        """Benchmark optimized PyTorch softmax implementation"""
         inputs = torch.randn(batch_size, dim, device=self.device)
         
         latencies = []
         
         # Warmup
         for _ in range(self.config.num_warmup):
-            # Naive approach: no shared memory reduction, element-wise operations
-            max_vals = torch.max(inputs, dim=1, keepdim=True)[0]
-            exp_vals = torch.exp(inputs - max_vals)
-            sum_vals = torch.sum(exp_vals, dim=1, keepdim=True)
-            result = exp_vals / sum_vals
+            # Use optimized PyTorch softmax
+            torch.softmax(inputs, dim=-1)
             torch.cuda.synchronize()
         
         # Benchmark
         for _ in range(self.config.num_trials):
             self.start_event.record()
-            max_vals = torch.max(inputs, dim=1, keepdim=True)[0]
-            exp_vals = torch.exp(inputs - max_vals)
-            sum_vals = torch.sum(exp_vals, dim=1, keepdim=True)
-            result = exp_vals / sum_vals
+            torch.softmax(inputs, dim=-1)
             self.end_event.record()
             
             torch.cuda.synchronize()
@@ -297,7 +284,7 @@ class GPUTaskQueueBenchmark:
         return self._compute_stats(latencies, "Baseline_Softmax")
     
     def _benchmark_baseline_price_vectors(self, batch_size: int, n_assets: int, n_features: int) -> Dict:
-        """Benchmark naive/unoptimized price vector processing"""
+        """Benchmark optimized PyTorch price vector processing"""
         prices = torch.randn(batch_size, n_assets, device=self.device) * 100
         weights = torch.randn(n_assets, n_features, device=self.device)
         
@@ -305,22 +292,14 @@ class GPUTaskQueueBenchmark:
         
         # Warmup
         for _ in range(self.config.num_warmup):
-            # Naive approach: element-wise computation without vectorization
-            result = torch.zeros(batch_size, n_features, device=self.device)
-            for b in range(batch_size):
-                for f in range(n_features):
-                    for a in range(n_assets):
-                        result[b, f] += prices[b, a] * weights[a, f]
+            # Use optimized PyTorch matrix multiplication
+            torch.mm(prices, weights)
             torch.cuda.synchronize()
         
         # Benchmark
         for _ in range(self.config.num_trials):
             self.start_event.record()
-            result = torch.zeros(batch_size, n_features, device=self.device)
-            for b in range(batch_size):
-                for f in range(n_features):
-                    for a in range(n_assets):
-                        result[b, f] += prices[b, a] * weights[a, f]
+            torch.mm(prices, weights)
             self.end_event.record()
             
             torch.cuda.synchronize()
@@ -342,7 +321,6 @@ class GPUTaskQueueBenchmark:
             'samples': len(latencies)
         }
     
-    # NEW: Calculate speedup between optimized and baseline
     def _calculate_speedup(self, optimized_stats: Dict, baseline_stats: Dict) -> Dict:
         """Calculate speedup metrics between optimized and baseline implementations"""
         speedup_median = baseline_stats['median_ms'] / optimized_stats['median_ms']
@@ -430,7 +408,7 @@ class GPUTaskQueueBenchmark:
             print("No results to plot. Run benchmark first.")
             return
         
-        # NEW: Enhanced plotting with baseline comparison
+        # Enhanced plotting with baseline comparison
         fig_height = 12 if self.config.run_baseline else 10
         fig, axes = plt.subplots(3 if self.config.run_baseline else 2, 2, figsize=(15, fig_height))
         fig.suptitle("GPU Task Queue Performance Analysis", fontsize=16)
@@ -469,7 +447,7 @@ class GPUTaskQueueBenchmark:
         axes[0, 1].set_title("Latency Tail Distribution")
         axes[0, 1].legend()
         
-        # NEW: Speedup visualization
+        # Speedup visualization
         if self.config.run_baseline and self.speedup_results:
             speedups = [s['speedup_median'] for s in self.speedup_results.values()]
             config_names = list(self.speedup_results.keys())
@@ -542,7 +520,7 @@ class GPUTaskQueueBenchmark:
             print(f"  P95: {stats['p95_ms']:.3f}ms")
             print(f"  Mean: {stats['mean_ms']:.3f}ms ± {stats['std_ms']:.3f}ms")
             
-            # NEW: Add baseline comparison if available
+            # Add baseline comparison if available
             if self.config.run_baseline and key in self.baseline_results:
                 baseline_stats = self.baseline_results[key]
                 speedup_stats = self.speedup_results[key]
@@ -557,7 +535,7 @@ class GPUTaskQueueBenchmark:
             best = min(cuda_results.items(), key=lambda x: x[1]['median_ms'])
             print(f"\n🏆 Best Performance: {best[0]} with {best[1]['median_ms']:.3f}ms median latency")
             
-            # NEW: Show best speedup if baseline available
+            # Show best speedup if baseline available
             if self.config.run_baseline and self.speedup_results:
                 best_speedup = max(self.speedup_results.items(), key=lambda x: x[1]['speedup_median'])
                 print(f"🚀 Best Speedup: {best_speedup[0]} with {best_speedup[1]['speedup_median']:.1f}x improvement")
