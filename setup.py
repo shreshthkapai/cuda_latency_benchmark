@@ -1,36 +1,35 @@
 import os
-# Set the CUDA_HOME environment variable before proceeding with other imports.
-os.environ['CUDA_HOME'] = '/usr'
-from setuptools import setup, Extension
-from pybind11.setup_helpers import Pybind11Extension, build_ext
+from setuptools import setup
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 import torch
 import pybind11
 
-# Function to detect the CUDA compute capability for optimized compilation.
+# Safe fallback for CUDA_HOME
+if "CUDA_HOME" not in os.environ:
+    os.environ["CUDA_HOME"] = torch.utils.cpp_extension.CUDA_HOME or "/usr/local/cuda"
+
+# Get compute capability (e.g. sm_75 for GTX 1650)
 def get_cuda_arch():
     if torch.cuda.is_available():
-        capability = torch.cuda.get_device_capability()
-        return f"sm_{capability[0]}{capability[1]}"
-    return "sm_75"  # Default architecture (e.g., GTX 1650) if CUDA is not available.
+        major, minor = torch.cuda.get_device_capability()
+        return f"-gencode=arch=compute_{major}{minor},code=sm_{major}{minor}"
+    return "-gencode=arch=compute_75,code=sm_75"
 
-# Compilation flags for CUDA, including Windows compatibility considerations.
 cuda_flags = [
-    "--use_fast_math",           # Enable fast math operations.
-    "-O3",                       # Apply maximum optimization level.
-    f"-gencode=arch=compute_75,code={get_cuda_arch()}",  # Specify target architecture.
-    "--extended-lambda",         # Enable C++11 lambda support.
-    "-DNVTX_DISABLE",            # Disable NVTX on Windows platforms.
+    "--use_fast_math",
+    "-O3",
+    get_cuda_arch(),
+    "--extended-lambda",
+    "-DNVTX_DISABLE",
 ]
 
 cpp_flags = [
-    "-O3",                       # Apply optimization for Windows.
-    "-std=c++17",                # Use the C++17 standard.
+    "-O3",
+    "-std=c++17",
     "-DWITH_CUDA",
-    "-DNVTX_DISABLE",            # Disable NVTX on Windows platforms.
+    "-DNVTX_DISABLE",
 ]
 
-# Definition of the CUDA extension with optimized kernels.
 cuda_extension = CUDAExtension(
     name="cuda_task_queue",
     sources=[
@@ -39,7 +38,7 @@ cuda_extension = CUDAExtension(
     ],
     extra_compile_args={
         "cxx": cpp_flags,
-        "nvcc": cuda_flags
+        "nvcc": cuda_flags,
     },
     include_dirs=[
         pybind11.get_cmake_dir() + "/../../../include",
