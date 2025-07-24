@@ -92,8 +92,7 @@ The project is composed of several key components that work together:
 ├── setup.py
 ├── benchmark.py
 ├── utils.py
-└── scripts/
-    └── run_all.sh
+└── runa_all.sh
 ```
 
 ## Building the Extension
