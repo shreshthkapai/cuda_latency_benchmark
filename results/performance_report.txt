@@ -1,0 +1,35 @@
+================================================================================
+🚀 GPU TASK QUEUE PERFORMANCE REPORT
+================================================================================
+
+🏆 Best Performer: gemv_b32_i64_o32 (0.011ms median)
+🐌 Worst Performer: price_b32_a64_f32 (0.044ms median)
+⚡ Average Speedup: 3.8x
+🚀 Maximum Speedup: 7.3x
+
+📊 DETAILED RESULTS:
+--------------------------------------------------------------------------------
+
+gemv_b32_i64_o32:
+  Latency: 0.011ms (median), 0.076ms (P95)
+  Throughput: 93563 ops/sec
+  🚀 Speedup: 7.3x (629.5% improvement)
+  Stability: ±0.032ms std dev
+
+gemv_b32_i64_o64:
+  Latency: 0.012ms (median), 0.147ms (P95)
+  Throughput: 82672 ops/sec
+  🚀 Speedup: 5.2x (424.2% improvement)
+  Stability: ±0.049ms std dev
+
+softmax_b32_d64:
+  Latency: 0.041ms (median), 0.178ms (P95)
+  Throughput: 24357 ops/sec
+  🚀 Speedup: 1.3x (29.7% improvement)
+  Stability: ±0.042ms std dev
+
+price_b32_a64_f32:
+  Latency: 0.044ms (median), 0.176ms (P95)
+  Throughput: 22498 ops/sec
+  🚀 Speedup: 1.5x (53.6% improvement)
+  Stability: ±0.042ms std dev
