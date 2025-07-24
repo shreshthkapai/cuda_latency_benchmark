@@ -96,7 +96,7 @@ save_results_json(results, '${RESULTS_DIR}/results.json')
     
     echo -e "${GREEN}✅ Benchmark completed successfully${NC}"
 }
-
+    
 generate_report() {
     echo -e "${BLUE}[3/4] Generating performance report...${NC}"
     
@@ -107,7 +107,9 @@ from utils import format_performance_report
 with open('${RESULTS_DIR}/results.json', 'r') as f:
     data = json.load(f)
 
-report = format_performance_report(data.get('results', data))
+from utils import format_performance_report, merge_results
+
+report = format_performance_report(merge_results(data['benchmark_results']))
 print(report)
 
 with open('${RESULTS_DIR}/performance_report.txt', 'w') as f:
