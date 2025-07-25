@@ -2,6 +2,8 @@
 
 This project implements a high-performance, sub-millisecond GPU task queue designed for real-time inference and other latency-sensitive workloads. By leveraging custom CUDA kernels, it provides significant performance improvements over standard PyTorch implementations for specific operations like batched GEMV (Generalized Matrix-Vector Multiplication), softmax, and financial feature engineering.
 
+Check out this Medium Article for detailed Technical Writeup [Medium](https://medium.com/@shreshthkapai/sub-millisecond-gpu-task-queue-breaking-pytorchs-latency-bottleneck-b6f3d3f2e895)
+
 The core of the repository is a C++/CUDA extension for PyTorch, which is benchmarked to demonstrate its low-latency capabilities. The system is designed for scenarios where minimizing computational latency is critical, such as in high-frequency trading, real-time bidding, or interactive services.
 
 ## Table of Contents
