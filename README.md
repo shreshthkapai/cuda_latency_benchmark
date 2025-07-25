@@ -35,36 +35,40 @@ The core of the repository is a C++/CUDA extension for PyTorch, which is benchma
 The benchmarks below were executed on the hardware specified in the Technical Specifications section. They demonstrate the exceptional performance of the custom CUDA kernels, achieving sub-millisecond latencies across various configurations.
 
 ```
-================================================================================
 🚀 GPU TASK QUEUE PERFORMANCE REPORT
 ================================================================================
 
-🏆 Best Performer: gemv_b32_i64_o64 (0.010ms median)
-🐌 Worst Performer: price_b32_a64_f32 (0.171ms median)
-⚡ Speedup: 17.0x improvement
+🏆 Best Performer: gemv_b32_i64_o32 (0.008ms median)
+🐌 Worst Performer: price_b32_a64_f32 (0.043ms median)
+⚡ Average Speedup: 4.5x
+🚀 Maximum Speedup: 7.5x
 
 📊 DETAILED RESULTS:
 --------------------------------------------------------------------------------
 
 gemv_b32_i64_o32:
-  Latency: 0.016ms (median), 0.169ms (P95)
-  Throughput: 62313 ops/sec
-  Stability: ±0.076ms std dev
+  Latency: 0.008ms (median), 0.032ms (P95)
+  Throughput: 131579 ops/sec
+  🚀 Speedup: 7.5x (650.1% improvement)
+  Stability: ±0.009ms std dev
 
 gemv_b32_i64_o64:
-  Latency: 0.010ms (median), 0.021ms (P95)
-  Throughput: 99364 ops/sec
-  Stability: ±0.014ms std dev
+  Latency: 0.010ms (median), 0.078ms (P95)
+  Throughput: 96154 ops/sec
+  🚀 Speedup: 5.1x (414.5% improvement)
+  Stability: ±0.020ms std dev
 
 softmax_b32_d64:
-  Latency: 0.045ms (median), 0.069ms (P95)
-  Throughput: 22132 ops/sec
-  Stability: ±0.018ms std dev
+  Latency: 0.040ms (median), 0.123ms (P95)
+  Throughput: 24733 ops/sec
+  🚀 Speedup: 1.2x (23.2% improvement)
+  Stability: ±0.145ms std dev
 
 price_b32_a64_f32:
-  Latency: 0.171ms (median), 0.198ms (P95)
-  Throughput: 5841 ops/sec
-  Stability: ±0.072ms std dev
+  Latency: 0.043ms (median), 0.069ms (P95)
+  Throughput: 23391 ops/sec
+  🚀 Speedup: 4.2x (319.6% improvement)
+  Stability: ±0.014ms std dev
 ```
 
 ## Technical Specifications
@@ -117,11 +121,11 @@ The `run_all.sh` script is the easiest way to build the extension and run the fu
 ### Usage:
 ```bash
 # Run with default parameters (batch_size=32, dim=64, repeats=100)
-./scripts/run_all.sh
+./run_all.sh
 
 # Run with custom parameters
 # Usage: ./run_all.sh [BATCH_SIZE] [DIM] [REPEATS]
-./scripts/run_all.sh 64 128 200
+./run_all.sh 64 128 200
 ```
 The script will:
 1. Clean any previous builds.
